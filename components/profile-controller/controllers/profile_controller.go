@@ -193,6 +193,13 @@ func (r *ProfileReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error)
 		return reconcile.Result{}, err
 	}
 
+	// Create minio secret in target namespace.
+	if err = r.updateSecret(instance); err != nil {
+		logger.Info("Failed Updating Secret", "namespace", instance.Name, "name",
+			"mlpipeline-minio-artifact", "error", err)
+		return reconcile.Result{}, err
+	}
+
 	// TODO: add role for impersonate permission
 
 	// Update owner rbac permission
@@ -478,6 +485,40 @@ func (r *ProfileReconciler) updateServiceAccount(profileIns *profilev1beta1.Prof
 		},
 	}
 	return r.updateRoleBinding(profileIns, roleBinding)
+}
+
+// updateSecret create minio secret in the target namespace owned by "profileIns"
+func (r *ProfileReconciler) updateSecret(profileIns *profilev1beta1.Profile) error {
+	logger := r.Log.WithValues("profile", profileIns.Name)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mlpipeline-minio-artifact",
+			Namespace: profileIns.Name,
+		},
+		Type: corev1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			"accesskey": []byte("bWluaW8="),
+			"secretkey": []byte("bWluaW8xMjM="),
+		},
+	}
+	if err := controllerutil.SetControllerReference(profileIns, secret, r.Scheme); err != nil {
+		return err
+	}
+	found := &corev1.Secret{}
+	err := r.Get(context.TODO(), types.NamespacedName{Name: secret.Name, Namespace: secret.Namespace}, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Info("Creating Secret", "namespace", secret.Namespace,
+				"name", secret.Name)
+			err = r.Create(context.TODO(), secret)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }
 
 // updateRoleBinding create or update roleBinding "roleBinding" in target namespace owned by "profileIns"
