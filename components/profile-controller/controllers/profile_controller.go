@@ -497,8 +497,8 @@ func (r *ProfileReconciler) updateSecret(profileIns *profilev1beta1.Profile) err
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"accesskey": []byte("bWluaW8="),
-			"secretkey": []byte("bWluaW8xMjM="),
+			"accesskey": []byte("minio"),
+			"secretkey": []byte("minio123"),
 		},
 	}
 	if err := controllerutil.SetControllerReference(profileIns, secret, r.Scheme); err != nil {
